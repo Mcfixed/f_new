@@ -1,0 +1,361 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+:root {
+  --bg-base: #080808;
+  --bg-surface: #101010;
+  --bg-card: #161616;
+  --bg-hover: #1e1e1e;
+  --bg-active: #222222;
+  --border: #2a2a2a;
+  --border-light: #333333;
+  --text-primary: #e8e8e8;
+  --text-secondary: #888888;
+  --text-muted: #555555;
+  --accent-green: #00e87a;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-blue: #3b82f6;
+  --accent-purple: #a855f7;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* ── Leaflet overrides ─────────────────────────────────────────────────── */
+.leaflet-container {
+  background: #0d0d0d !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.leaflet-tile {
+  filter: brightness(0.65) saturate(0.3) contrast(1.1);
+}
+
+.leaflet-control-attribution {
+  background: rgba(8, 8, 8, 0.8) !important;
+  color: var(--text-muted) !important;
+  font-size: 9px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--text-muted) !important;
+}
+
+.leaflet-control-zoom a {
+  background: var(--bg-card) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
+}
+
+.leaflet-popup-tip {
+  background: var(--bg-card) !important;
+}
+
+.leaflet-popup-close-button {
+  color: var(--text-secondary) !important;
+}
+
+/* ── Custom sensor marker ──────────────────────────────────────────────── */
+.sensor-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.sensor-marker:hover {
+  transform: scale(1.6);
+}
+
+.sensor-marker.online {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green), 0 0 16px rgba(0, 232, 122, 0.3);
+}
+
+.sensor-marker.warning {
+  background: var(--accent-amber);
+  box-shadow: 0 0 8px var(--accent-amber), 0 0 16px rgba(245, 158, 11, 0.3);
+}
+
+.sensor-marker.offline {
+  background: #3a3a3a;
+  box-shadow: none;
+}
+
+/* ── Animations ────────────────────────────────────────────────────────── */
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-8px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(8px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Sonar ping — expanding ring */
+@keyframes sonar-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+
+  100% {
+    transform: scale(6);
+    opacity: 0;
+  }
+}
+
+/* Critical card entrance */
+@keyframes critical-enter {
+  0% {
+    transform: translateX(20px) scale(0.95);
+    opacity: 0;
+  }
+
+  60% {
+    transform: translateX(-3px) scale(1.01);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Screen-edge red vignette pulse */
+@keyframes vignette-pulse {
+
+  0%,
+  100% {
+    opacity: 0.18;
+  }
+
+  50% {
+    opacity: 0.40;
+  }
+}
+
+/* Flicker for the critical label */
+@keyframes text-flicker {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  48% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+
+  52% {
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in-left 0.2s ease forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.2s ease forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease forwards;
+}
+
+.animate-critical {
+  animation: critical-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ── Sonar marker ──────────────────────────────────────────────────────── */
+.sonar-wrapper {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sonar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #ef4444;
+  animation: sonar-ring 2.2s ease-out infinite;
+  pointer-events: none;
+}
+
+.sonar-ring:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.sonar-ring:nth-child(2) {
+  animation-delay: 0.7s;
+}
+
+.sonar-ring:nth-child(3) {
+  animation-delay: 1.4s;
+}
+
+.sonar-core {
+  position: relative;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 12px #ef4444, 0 0 28px #ef444466;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #fff;
+  font-weight: 900;
+}
+
+/* ── Utility classes ───────────────────────────────────────────────────── */
+.glass-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.glass-card-hover {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.glass-card-hover:hover {
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot.online {
+  background: var(--accent-green);
+  box-shadow: 0 0 4px var(--accent-green);
+}
+
+.status-dot.warning {
+  background: var(--accent-amber);
+  box-shadow: 0 0 4px var(--accent-amber);
+  animation: pulse-glow 1.5s infinite;
+}
+
+.status-dot.offline {
+  background: #444;
+}
