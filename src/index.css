@@ -359,3 +359,41 @@ body {
 .status-dot.offline {
   background: #444;
 }
+
+/* ── Catenary line animations ──────────────────────────────────────────── */
+@keyframes catenary-pulse {
+
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes catenary-glow {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px #ef4444) drop-shadow(0 0 12px #ef444488);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 14px #ef4444) drop-shadow(0 0 28px #ef4444aa);
+  }
+}
+
+.catenary-disconnected {
+  animation: catenary-pulse 1.2s ease-in-out infinite;
+}
+
+/* Substation marker */
+.substation-marker {
+  transition: transform 0.15s ease;
+}
+
+.substation-marker:hover {
+  transform: scale(1.3);
+}

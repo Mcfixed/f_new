@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import {
@@ -8,6 +8,10 @@ import {
 import sensors from '../data/sensors';
 import { alerts, alertCountsByGroup, type Alert } from '../data/mockData';
 import gateways from '../data/gateways';
+import {
+    catenarySegments, substations, catenaryStats,
+    type CatenarySegment, type Substation,
+} from '../data/catenary';
 import type { Sensor } from '../data/sensors';
 import type { Gateway } from '../data/gateways';
 
@@ -107,6 +111,92 @@ function GatewayMarkersLayer({ onSelect }: { onSelect: (g: Gateway) => void }) {
       </svg>`;
             const icon = L.divIcon({ html: el, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
             L.marker([gw.lat, gw.lng], { icon, zIndexOffset: 1000 }).addTo(layer).on('click', () => onSelect(gw));
+        });
+        return () => { layer.clearLayers(); map.removeLayer(layer); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [map]);
+    return null;
+}
+
+// ── Catenary lines layer ──────────────────────────────────────────────────────
+function CatenaryLinesLayer({ onSelectSegment }: { onSelectSegment: (s: CatenarySegment) => void }) {
+    const map = useMap();
+    useEffect(() => {
+        const layer = L.layerGroup().addTo(map);
+
+        catenarySegments.forEach(seg => {
+            if (seg.connected) {
+                // Green healthy line
+                const line = L.polyline(seg.coords, {
+                    color: '#00e87a',
+                    weight: seg.cable === 'A' ? 3 : 3,
+                    opacity: 0.5,
+                    dashArray: seg.cable === 'B' ? '8 4' : undefined,
+                    interactive: true,
+                }).addTo(layer);
+                line.on('click', () => onSelectSegment(seg));
+                line.on('mouseover', () => line.setStyle({ opacity: 0.9, weight: 5 }));
+                line.on('mouseout', () => line.setStyle({ opacity: 0.5, weight: 3 }));
+            } else {
+                // Red pulsing disconnected line — we create an outer glow + inner line
+                // Glow layer
+                const glow = L.polyline(seg.coords, {
+                    color: '#ef4444',
+                    weight: 10,
+                    opacity: 0.3,
+                    interactive: false,
+                    className: 'catenary-disconnected',
+                }).addTo(layer);
+
+                // Main line
+                const line = L.polyline(seg.coords, {
+                    color: '#ef4444',
+                    weight: 4,
+                    opacity: 0.9,
+                    dashArray: seg.cable === 'B' ? '8 4' : undefined,
+                    interactive: true,
+                    className: 'catenary-disconnected',
+                }).addTo(layer);
+                line.on('click', () => onSelectSegment(seg));
+                line.on('mouseover', () => {
+                    line.setStyle({ weight: 6, opacity: 1 });
+                    glow.setStyle({ weight: 14, opacity: 0.5 });
+                });
+                line.on('mouseout', () => {
+                    line.setStyle({ weight: 4, opacity: 0.9 });
+                    glow.setStyle({ weight: 10, opacity: 0.3 });
+                });
+            }
+        });
+
+        return () => { layer.clearLayers(); map.removeLayer(layer); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [map]);
+    return null;
+}
+
+// ── Substation markers ────────────────────────────────────────────────────────
+function SubstationMarkersLayer({ onSelect }: { onSelect: (s: Substation) => void }) {
+    const map = useMap();
+    useEffect(() => {
+        const layer = L.layerGroup().addTo(map);
+        substations.forEach(sub => {
+            const color = sub.status === 'online' ? '#00e87a' : '#ef4444';
+            const el = document.createElement('div');
+            el.className = 'substation-marker';
+            el.style.cssText = `
+                width: 20px; height: 20px;
+                transform: rotate(45deg);
+                background: ${color}22; border: 2px solid ${color};
+                display: flex; align-items: center; justify-content: center;
+                cursor: pointer;
+                box-shadow: 0 0 10px ${color}55, 0 0 20px ${color}22;
+                ${sub.status === 'offline' ? 'animation: catenary-pulse 1.2s ease-in-out infinite;' : ''}
+            `;
+            el.innerHTML = `<svg style="transform:rotate(-45deg)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`;
+            const icon = L.divIcon({ html: el, className: '', iconSize: [20, 20], iconAnchor: [10, 10] });
+            L.marker([sub.lat, sub.lng], { icon, zIndexOffset: 1500 })
+                .addTo(layer).on('click', () => onSelect(sub));
         });
         return () => { layer.clearLayers(); map.removeLayer(layer); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,8 +355,56 @@ const ChartTooltip = ({ active, payload, label }: any) => {
     );
 };
 
+// ── Catenary segment popup ────────────────────────────────────────────────────
+function CatenaryPopup({ seg, onClose }: { seg: CatenarySegment; onClose: () => void }) {
+    const c = seg.connected ? 'var(--accent-green)' : '#ef4444';
+    return (
+        <div className="glass-card animate-fade-in" style={{ position: 'absolute', top: 80, left: 12, width: 268, padding: 14, zIndex: 1002, border: `1px solid ${c}60`, boxShadow: seg.connected ? 'none' : '0 0 24px #ef444430' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: c, animation: seg.connected ? undefined : 'text-flicker 2.5s infinite' }}>
+                    {seg.connected ? '✓ CATENARIA CONECTADA' : '⚡ CATENARIA DESCONECTADA'}
+                </span>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+            </div>
+            <Row label="Segmento" value={seg.id} />
+            <Row label="Cable" value={`Catenaria ${seg.cable}`} />
+            <Row label="Estado" value={seg.connected ? 'CONECTADO' : 'DESCONECTADO'} color={c} />
+            {seg.disconnectedSince && <Row label="Desde" value={new Date(seg.disconnectedSince).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} color="#ef4444" />}
+            {seg.disconnectReason && (
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8, padding: '6px 8px', borderRadius: 4, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                    {seg.disconnectReason}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Substation popup ──────────────────────────────────────────────────────────
+function SubstationPopup({ sub, onClose }: { sub: Substation; onClose: () => void }) {
+    const c = sub.status === 'online' ? 'var(--accent-green)' : '#ef4444';
+    // Count segments touching this substation
+    const touchingSegs = catenarySegments.filter(s => s.fromSubstation === sub.id || s.toSubstation === sub.id);
+    const disconnectedSegs = touchingSegs.filter(s => !s.connected);
+    return (
+        <div className="glass-card animate-fade-in" style={{ position: 'absolute', top: 80, left: 12, width: 258, padding: 14, zIndex: 1002 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{sub.name}</span>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+            </div>
+            <Row label="Estado" value={sub.status.toUpperCase()} color={c} />
+            <Row label="Segmentos adyacentes" value={touchingSegs.length} />
+            <Row label="Seg. desconectados" value={disconnectedSegs.length} color={disconnectedSegs.length > 0 ? '#ef4444' : 'var(--accent-green)'} />
+        </div>
+    );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-type MapSel = { kind: 'sensor'; data: Sensor } | { kind: 'gateway'; data: Gateway } | null;
+type MapSel =
+    | { kind: 'sensor'; data: Sensor }
+    | { kind: 'gateway'; data: Gateway }
+    | { kind: 'catenary'; data: CatenarySegment }
+    | { kind: 'substation'; data: Substation }
+    | null;
 
 export default function Dashboard() {
     const [mapSel, setMapSel] = useState<MapSel>(null);
@@ -302,6 +440,8 @@ export default function Dashboard() {
                 <div style={{ flex: 1, position: 'relative' }}>
                     <MapContainer center={[-33.4489, -70.6693]} zoom={12} style={{ width: '100%', height: '100%' }}>
                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
+                        <CatenaryLinesLayer onSelectSegment={seg => setMapSel({ kind: 'catenary', data: seg })} />
+                        <SubstationMarkersLayer onSelect={sub => setMapSel({ kind: 'substation', data: sub })} />
                         <SensorMarkersLayer onSelect={s => setMapSel({ kind: 'sensor', data: s })} />
                         <FreefallMarkersLayer onSelect={a => setActiveCritical(a)} />
                         <MotionCriticalMarkersLayer onSelect={a => setActiveCritical(a)} />
@@ -311,6 +451,8 @@ export default function Dashboard() {
                     {/* Sensor / Gateway popup (top-right corner of map) */}
                     {mapSel?.kind === 'sensor' && <SensorPopup sensor={mapSel.data} onClose={() => setMapSel(null)} />}
                     {mapSel?.kind === 'gateway' && <GatewayPopup gw={mapSel.data} onClose={() => setMapSel(null)} />}
+                    {mapSel?.kind === 'catenary' && <CatenaryPopup seg={mapSel.data} onClose={() => setMapSel(null)} />}
+                    {mapSel?.kind === 'substation' && <SubstationPopup sub={mapSel.data} onClose={() => setMapSel(null)} />}
 
                     {/* Clicked critical alert detail (top-left corner of map) */}
                     {activeCritical && (
@@ -356,25 +498,111 @@ export default function Dashboard() {
                     <div className="glass-card" style={{ position: 'absolute', top: 12, right: mapSel ? 270 : 12, zIndex: 999, padding: '8px 12px' }}>
                         <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 1 }}>LEYENDA</div>
                         {[
-                            { label: 'Sensor online', color: 'var(--accent-green)', dot: true },
-                            { label: 'Sensor warning', color: 'var(--accent-amber)', dot: true },
-                            { label: 'Sensor offline', color: '#3a3a3a', dot: true },
-                            { label: 'Gateway activo', color: 'var(--accent-green)', dot: false },
-                            { label: 'Gateway degradado', color: 'var(--accent-amber)', dot: false },
-                            { label: 'Gateway inactivo', color: '#444', dot: false },
-                            { label: 'Alerta caída libre', color: '#ef4444', dot: true },
-                            { label: 'Movimiento crítico', color: '#f59e0b', dot: true },
-                        ].map(({ label, color, dot }) => (
+                            { label: 'Sensor online', color: 'var(--accent-green)', shape: 'dot' as const },
+                            { label: 'Sensor warning', color: 'var(--accent-amber)', shape: 'dot' as const },
+                            { label: 'Sensor offline', color: '#3a3a3a', shape: 'dot' as const },
+                            { label: 'Gateway activo', color: 'var(--accent-green)', shape: 'square' as const },
+                            { label: 'Gateway degradado', color: 'var(--accent-amber)', shape: 'square' as const },
+                            { label: 'Gateway inactivo', color: '#444', shape: 'square' as const },
+                            { label: 'Alerta caída libre', color: '#ef4444', shape: 'dot' as const },
+                            { label: 'Movimiento crítico', color: '#f59e0b', shape: 'dot' as const },
+                        ].map(({ label, color, shape }) => (
                             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                <div style={{ width: 9, height: 9, borderRadius: dot ? '50%' : 2, background: color, boxShadow: !['#3a3a3a', '#444'].includes(color) ? `0 0 5px ${color}` : 'none', flexShrink: 0 }} />
+                                <div style={{ width: 9, height: 9, borderRadius: shape === 'dot' ? '50%' : 2, background: color, boxShadow: !['#3a3a3a', '#444'].includes(color) ? `0 0 5px ${color}` : 'none', flexShrink: 0 }} />
                                 <span style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{label}</span>
                             </div>
                         ))}
+                        {/* Catenary legend */}
+                        <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4 }}>
+                            {[
+                                { label: 'Catenaria OK', color: 'var(--accent-green)' },
+                                { label: 'Catenaria desconectada', color: '#ef4444' },
+                                { label: 'Subestación', color: 'var(--accent-green)' },
+                            ].map(({ label, color }) => (
+                                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    {label.includes('Subestación') ? (
+                                        <div style={{ width: 9, height: 9, transform: 'rotate(45deg)', border: `2px solid ${color}`, flexShrink: 0 }} />
+                                    ) : (
+                                        <div style={{ width: 14, height: 3, borderRadius: 1, background: color, boxShadow: `0 0 4px ${color}`, flexShrink: 0 }} />
+                                    )}
+                                    <span style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{label}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
                 {/* RIGHT: Alerts panel */}
                 <div style={{ width: 268, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+
+                    {/* ── Catenary alerts section ──────────────────────────── */}
+                    {catenaryStats.disconnected > 0 && (
+                        <div style={{
+                            borderBottom: '1px solid var(--border)',
+                            background: 'rgba(239,68,68,0.04)',
+                            flexShrink: 0,
+                        }}>
+                            <div style={{
+                                padding: '8px 12px',
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                borderBottom: '1px solid rgba(239,68,68,0.15)',
+                            }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="3" strokeLinecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+                                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: '#ef4444', animation: 'text-flicker 2.5s infinite' }}>
+                                    CATENARIA
+                                </span>
+                                <span style={{
+                                    marginLeft: 'auto', fontSize: 9, fontWeight: 700,
+                                    color: '#ef4444', padding: '2px 6px', borderRadius: 10,
+                                    background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+                                }}>
+                                    {catenaryStats.disconnected} DESCONECTADOS
+                                </span>
+                            </div>
+                            <div style={{ padding: '6px 12px', display: 'flex', gap: 6 }}>
+                                <div style={{ flex: 1, padding: '5px 8px', borderRadius: 6, background: 'rgba(0,232,122,0.06)', border: '1px solid rgba(0,232,122,0.15)', textAlign: 'center' }}>
+                                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-green)' }}>{catenaryStats.connected}</div>
+                                    <div style={{ fontSize: 7, color: 'var(--text-muted)', marginTop: 1 }}>CONECTADOS</div>
+                                </div>
+                                <div style={{ flex: 1, padding: '5px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', textAlign: 'center' }}>
+                                    <div style={{ fontSize: 15, fontWeight: 700, color: '#ef4444', animation: 'text-flicker 2.5s infinite' }}>{catenaryStats.disconnected}</div>
+                                    <div style={{ fontSize: 7, color: 'var(--text-muted)', marginTop: 1 }}>DESCONECT.</div>
+                                </div>
+                            </div>
+                            {/* Disconnected segment list */}
+                            <div style={{ padding: '0 8px 8px' }}>
+                                {catenarySegments.filter(s => !s.connected).map(seg => (
+                                    <div
+                                        key={seg.id}
+                                        onClick={() => setMapSel({ kind: 'catenary', data: seg })}
+                                        style={{
+                                            padding: '7px 10px', marginBottom: 4, borderRadius: 6, cursor: 'pointer',
+                                            background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
+                                            transition: 'all 0.15s',
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444' }}>
+                                                ⚡ Cable {seg.cable} — {seg.id}
+                                            </span>
+                                            {seg.disconnectedSince && (
+                                                <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+                                                    {new Date(seg.disconnectedSince).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {seg.disconnectReason && (
+                                            <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 3 }}>
+                                                {seg.disconnectReason}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Sensor alerts section ──────────────────────────── */}
                     <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                             <span style={{ fontSize: 12, fontWeight: 600 }}>Alertas entrantes</span>

@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import Dashboard from './views/Dashboard';
 import SensorAnalysis from './views/SensorAnalysis';
 import SystemLog from './views/SystemLog';
+import SignalHeatMap from './views/SignalHeatMap';
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="sensors" element={<SensorAnalysis />} />
+          <Route path="signal-map" element={<SignalHeatMap />} />
           <Route path="logs" element={<SystemLog />} />
         </Route>
       </Routes>
